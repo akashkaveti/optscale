@@ -1,0 +1,422 @@
+# =============================================================================
+# BUMI SCHEDULER
+# =============================================================================
+{{- if .Values.bumiScheduler.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bumi-scheduler
+  labels:
+    app: bumi-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.bumiScheduler.replicaCount }}
+  selector:
+    matchLabels:
+      app: bumi-scheduler
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: bumi-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: bumi-scheduler
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.bumiScheduler.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.bumiScheduler.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# BUMI WORKER
+# =============================================================================
+{{- if .Values.bumiWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bumi-worker
+  labels:
+    app: bumi-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.bumiWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: bumi-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: bumi-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: bumi-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.bumiWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.bumiWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# INSIDER API
+# =============================================================================
+{{- if .Values.insiderApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: insider-api
+  labels:
+    app: insider-api
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.insiderApi.service.type }}
+  ports:
+    - port: {{ .Values.insiderApi.service.port }}
+      targetPort: {{ .Values.insiderApi.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: insider-api
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insider-api
+  labels:
+    app: insider-api
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.insiderApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: insider-api
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: insider-api
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+      containers:
+        - name: insider-api
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.insiderApi.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.insiderApi.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- include "optscale.readinessProbe" (dict "port" .Values.insiderApi.service.targetPort) | nindent 10 }}
+          {{- with .Values.insiderApi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# INSIDER WORKER
+# =============================================================================
+{{- if .Values.insiderWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insider-worker
+  labels:
+    app: insider-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.insiderWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: insider-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: insider-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: insider-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.insiderWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.insiderWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# METROCULUS API
+# =============================================================================
+{{- if .Values.metroculusApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: metroculus-api
+  labels:
+    app: metroculus-api
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.metroculusApi.service.type }}
+  ports:
+    - port: {{ .Values.metroculusApi.service.port }}
+      targetPort: {{ .Values.metroculusApi.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: metroculus-api
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metroculus-api
+  labels:
+    app: metroculus-api
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.metroculusApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: metroculus-api
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: metroculus-api
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+      containers:
+        - name: metroculus-api
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.metroculusApi.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.metroculusApi.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- include "optscale.readinessProbe" (dict "port" .Values.metroculusApi.service.targetPort) | nindent 10 }}
+          {{- with .Values.metroculusApi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# METROCULUS WORKER
+# =============================================================================
+{{- if .Values.metroculusWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metroculus-worker
+  labels:
+    app: metroculus-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.metroculusWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: metroculus-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: metroculus-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: metroculus-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.metroculusWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.metroculusWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+
+---
+# =============================================================================
+# TRAPPER WORKER
+# =============================================================================
+{{- if .Values.trapperWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trapper-worker
+  labels:
+    app: trapper-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.trapperWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: trapper-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: trapper-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: trapper-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.trapperWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.trapperWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# RISP WORKER
+# =============================================================================
+{{- if .Values.rispWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risp-worker
+  labels:
+    app: risp-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.rispWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: risp-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: risp-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: risp-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.rispWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.rispWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# GEMINI WORKER
+# =============================================================================
+{{- if .Values.geminiWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-worker
+  labels:
+    app: gemini-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.geminiWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: gemini-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: gemini-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: gemini-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.geminiWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.geminiWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+# =============================================================================
+# BI EXPORTER
+# =============================================================================
+{{- if .Values.biExporter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bi-exporter
+  labels:
+    app: bi-exporter
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.biExporter.replicaCount }}
+  selector:
+    matchLabels:
+      app: bi-exporter
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: bi-exporter
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: bi-exporter
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.biExporter.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.biExporter.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

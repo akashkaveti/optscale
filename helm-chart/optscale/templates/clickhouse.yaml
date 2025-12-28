@@ -1,0 +1,251 @@
+{{- if and .Values.clickhouse.enabled (not .Values.clickhouse.external) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-init
+  labels:
+    app: clickhouse
+    {{- include "optscale.labels" . | nindent 4 }}
+data:
+  init-db.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Connect to clickhouse service
+    CH_HOST="clickhouse"
+    CH_PORT="9000"
+    
+    echo "Creating risp database..."
+    clickhouse-client --host=$CH_HOST --port=$CH_PORT --query "CREATE DATABASE IF NOT EXISTS risp"
+    
+    echo "Creating default.expenses table..."
+    clickhouse-client --host=$CH_HOST --port=$CH_PORT --query "
+    CREATE TABLE IF NOT EXISTS default.expenses (
+        cloud_account_id String,
+        resource_id String,
+        date DateTime,
+        cost Float64,
+        sign Int8
+    ) ENGINE = CollapsingMergeTree(sign)
+    PARTITION BY toYYYYMM(date)
+    ORDER BY (cloud_account_id, date, resource_id)
+    "
+    
+    echo "Creating default.traffic_expenses table..."
+    clickhouse-client --host=$CH_HOST --port=$CH_PORT --query "
+    CREATE TABLE IF NOT EXISTS default.traffic_expenses (
+        cloud_account_id String,
+        resource_id String,
+        date DateTime,
+        type Enum8('outbound' = 1, 'inbound' = 2),
+        from String,
+        to String,
+        usage Float64,
+        cost Float64,
+        sign Int8
+    ) ENGINE = CollapsingMergeTree(sign)
+    PARTITION BY toYYYYMM(date)
+    ORDER BY (cloud_account_id, resource_id, date, from, to)
+    "
+    
+    echo "Creating risp.ri_sp_usage table..."
+    clickhouse-client --host=$CH_HOST --port=$CH_PORT --query "
+    CREATE TABLE IF NOT EXISTS risp.ri_sp_usage (
+        cloud_account_id String,
+        resource_id String,
+        date DateTime,
+        offer_id String,
+        offer_type Enum8('ri' = 1, 'sp' = 2),
+        offer_cost Float64,
+        on_demand_cost Float64,
+        usage Float64,
+        ri_norm_factor Float64,
+        sp_rate Float64,
+        expected_cost Float64,
+        sign Int8
+    ) ENGINE = CollapsingMergeTree(sign)
+    PARTITION BY toYYYYMM(date)
+    ORDER BY (cloud_account_id, resource_id, date, offer_id, offer_type)
+    "
+    
+    echo "Creating risp.uncovered_usage table..."
+    clickhouse-client --host=$CH_HOST --port=$CH_PORT --query "
+    CREATE TABLE IF NOT EXISTS risp.uncovered_usage (
+        cloud_account_id String,
+        resource_id String,
+        date DateTime,
+        instance_type String,
+        os String,
+        location String,
+        usage Float64,
+        cost Float64,
+        sign Int8
+    ) ENGINE = CollapsingMergeTree(sign)
+    PARTITION BY toYYYYMM(date)
+    ORDER BY (cloud_account_id, resource_id, date)
+    "
+    
+    echo "Creating risp.schema_versions table..."
+    clickhouse-client --host=$CH_HOST --port=$CH_PORT --query "
+    CREATE TABLE IF NOT EXISTS risp.schema_versions (
+        version UInt32,
+        md5 String,
+        applied_at DateTime DEFAULT now()
+    ) ENGINE = MergeTree()
+    ORDER BY version
+    "
+    
+    echo "ClickHouse initialization complete!"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  labels:
+    app: clickhouse
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.clickhouse.service.httpPort }}
+      targetPort: 8123
+      protocol: TCP
+      name: http
+    - port: {{ .Values.clickhouse.service.nativePort }}
+      targetPort: 9000
+      protocol: TCP
+      name: native
+  selector:
+    app: clickhouse
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  labels:
+    app: clickhouse
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  serviceName: clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: clickhouse
+          image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}"
+          imagePullPolicy: {{ .Values.clickhouse.image.pullPolicy }}
+          ports:
+            - containerPort: 8123
+              name: http
+            - containerPort: 9000
+              name: native
+          env:
+            - name: CLICKHOUSE_DB
+              value: {{ .Values.clickhouse.db.name | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.clickhouse.db.user | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optscale.fullname" . }}-clickhouse
+                  key: password
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          {{- with .Values.clickhouse.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: clickhouse-init
+            defaultMode: 0755
+        {{- if .Values.clickhouse.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: clickhouse-data
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+---
+# ClickHouse Init Job - ensures tables exist on every deploy
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-init-{{ .Release.Revision }}
+  labels:
+    app: clickhouse-init
+    {{- include "optscale.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: clickhouse-init
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "clickhouse" "service" "clickhouse" "namespace" .Release.Namespace "port" "8123") | nindent 8 }}
+      containers:
+        - name: clickhouse-init
+          image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}"
+          imagePullPolicy: {{ .Values.clickhouse.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - /scripts/init-db.sh
+          volumeMounts:
+            - name: init-scripts
+              mountPath: /scripts
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: clickhouse-init
+            defaultMode: 0755
+{{- if .Values.clickhouse.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clickhouse-data
+  labels:
+    app: clickhouse
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.clickhouse.persistence.size }}
+{{- end }}
+{{- end }}

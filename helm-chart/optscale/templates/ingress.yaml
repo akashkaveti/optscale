@@ -1,0 +1,142 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "optscale.fullname" . }}
+  labels:
+    {{- include "optscale.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ssl.enabled }}
+    {{- if .Values.ssl.forceRedirect }}
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- end }}
+    {{- if .Values.ssl.certManager.enabled }}
+    cert-manager.io/{{ .Values.ssl.certManager.issuerType }}: {{ .Values.ssl.certManager.issuer | quote }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "512m"
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ssl.enabled }}
+  tls:
+    - secretName: {{ .Values.ssl.certificateSecretName }}
+      {{- if .Values.cluster.publicIp }}
+      hosts:
+        - {{ .Values.cluster.publicIp }}
+      {{- end }}
+  {{- end }}
+  rules:
+    {{- if .Values.cluster.publicIp }}
+    - host: {{ .Values.cluster.publicIp }}
+      http:
+    {{- else }}
+    - http:
+    {{- end }}
+        paths:
+          # Frontend UI
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ngui
+                port:
+                  number: 80
+          # Auth API
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth
+                port:
+                  number: 80
+          # REST API
+          - path: /restapi
+            pathType: Prefix
+            backend:
+              service:
+                name: restapi
+                port:
+                  number: 80
+          # Keeper (reports)
+          - path: /report
+            pathType: Prefix
+            backend:
+              service:
+                name: keeper
+                port:
+                  number: 80
+          # Herald (notifications)
+          - path: /herald
+            pathType: Prefix
+            backend:
+              service:
+                name: herald
+                port:
+                  number: 80
+          # Katara (reports)
+          - path: /katara
+            pathType: Prefix
+            backend:
+              service:
+                name: katara
+                port:
+                  number: 80
+          # Insider (pricing)
+          - path: /insider
+            pathType: Prefix
+            backend:
+              service:
+                name: insider-api
+                port:
+                  number: 80
+          # Metroculus (metrics)
+          - path: /metroculus
+            pathType: Prefix
+            backend:
+              service:
+                name: metroculus-api
+                port:
+                  number: 80
+          # DIProxy (storage)
+          - path: /storage
+            pathType: Prefix
+            backend:
+              service:
+                name: diproxy
+                port:
+                  number: 80
+          {{- if .Values.slacker.enabled }}
+          # Slacker (Slack integration)
+          - path: /slacker
+            pathType: Prefix
+            backend:
+              service:
+                name: slacker
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.jiraBus.enabled }}
+          # Jira integration
+          - path: /jira_bus
+            pathType: Prefix
+            backend:
+              service:
+                name: jira-bus
+                port:
+                  number: 80
+          - path: /jira_ui
+            pathType: Prefix
+            backend:
+              service:
+                name: jira-ui
+                port:
+                  number: 80
+          {{- end }}
+{{- end }}

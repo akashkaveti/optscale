@@ -1,0 +1,76 @@
+
+================================================================================
+  OptScale has been deployed!
+================================================================================
+
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named: {{ .Release.Name }}
+
+To get the application URL:
+
+{{- if .Values.ingress.enabled }}
+{{- if .Values.cluster.publicIp }}
+  https://{{ .Values.cluster.publicIp }}
+{{- else }}
+  kubectl get ingress {{ include "optscale.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+{{- end }}
+{{- else }}
+  export POD_NAME=$(kubectl get pods -l "app=ngui" -o jsonpath="{.items[0].metadata.name}")
+  kubectl port-forward $POD_NAME 8080:4000
+  Then visit: http://localhost:8080
+{{- end }}
+
+To check the status of your deployment:
+
+  kubectl get pods -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+To view logs:
+
+  kubectl logs -l "app=restapi" -f
+  kubectl logs -l "app=diworker" -f
+
+================================================================================
+  IMPORTANT: First-time Setup
+================================================================================
+
+1. Wait for all pods to be ready:
+   kubectl get pods -w
+
+2. Create your first admin user by accessing the UI
+
+3. Connect your AWS account:
+   - Go to Settings > Data Sources
+   - Add AWS data source with your credentials
+   - Configure Cost & Usage Report (CUR) in AWS
+
+4. For Kubernetes cost monitoring:
+   - Deploy the OptScale agent in your clusters
+   - See documentation for agent setup
+
+================================================================================
+  Useful Commands
+================================================================================
+
+# Check all services
+kubectl get svc -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+# View MariaDB logs
+kubectl logs -l "app=mariadb" -f
+
+# Access MariaDB
+kubectl exec -it $(kubectl get pod -l "app=mariadb" -o name) -- mysql -p
+
+# View RabbitMQ management UI
+kubectl port-forward svc/rabbitmq 15672:15672
+# Then visit: http://localhost:15672
+
+================================================================================
+  Documentation
+================================================================================
+
+Full documentation: https://hystax.com/documentation/optscale/
+GitHub: https://github.com/hystax/optscale
+
+For issues with this Helm chart, please open an issue on GitHub.
+

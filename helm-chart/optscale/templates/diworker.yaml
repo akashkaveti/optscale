@@ -1,0 +1,38 @@
+{{- if .Values.diworker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diworker
+  labels:
+    app: diworker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.diworker.replicaCount }}
+  selector:
+    matchLabels:
+      app: diworker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: diworker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "restapi" "service" "restapi" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+      containers:
+        - name: diworker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.diworker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "optscale.fullname" . }}-config
+          {{- with .Values.diworker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

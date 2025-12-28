@@ -1,0 +1,64 @@
+# =============================================================================
+# REPORT IMPORT SCHEDULER
+# Triggers periodic data imports from cloud accounts
+# =============================================================================
+{{- if .Values.reportImportScheduler.enabled }}
+{{- $schedules := dict "0" "*/15 * * * *" "1" "0 * * * *" "6" "0 */6 * * *" "24" "0 0 * * *" }}
+{{- range $period, $schedule := $schedules }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: report-import-scheduler-{{ $period }}
+  labels:
+    app: report-import-scheduler
+    {{- include "optscale.labels" $ | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: "{{ $schedule }}"
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: report-import-scheduler-{{ $period }}
+        {{- include "optscale.selectorLabels" $ | nindent 8 }}
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: report-import-scheduler-{{ $period }}
+            {{- include "optscale.selectorLabels" $ | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "restapi" "service" "restapi" "namespace" $.Release.Namespace "port" "80") | nindent 12 }}
+          containers:
+            - name: report-import-scheduler
+              image: curlimages/curl:8.5.0
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PERIOD
+                  value: "{{ $period }}"
+                - name: CLUSTER_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "optscale.fullname" $ }}-cluster
+                      key: cluster-secret
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  set -e
+                  DATA_PAYLOAD='{"period": '"$PERIOD"'}'
+                  URL="http://restapi:80/restapi/v2/schedule_imports"
+                  echo "Triggering import for period $PERIOD"
+                  curl -sS -X POST -f \
+                    -H "Content-Type: application/json" \
+                    -H "Secret: $CLUSTER_SECRET" \
+                    -d "$DATA_PAYLOAD" \
+                    "$URL"
+          restartPolicy: Never
+{{- end }}
+{{- end }}

@@ -1,0 +1,170 @@
+# Example values file for OptScale deployment
+# Copy this file and customize for your environment
+#
+# Usage: helm install optscale ./optscale -f values-example.yaml
+
+# =============================================================================
+# REQUIRED: Update these values before deployment
+# =============================================================================
+
+global:
+  # Use official Hystax images initially
+  # Change to "akashkaveti" when you build your own images
+  imageRegistry: "hystax"
+  imageTag: "latest"
+  imagePullPolicy: IfNotPresent
+
+cluster:
+  # Your OptScale public IP or domain name
+  publicIp: "optscale.example.com"
+  companyName: "MyCompany"
+  productName: "OptScale"
+
+# IMPORTANT: Generate unique secrets before deployment!
+# Use: uuidgen for clusterSecret
+secrets:
+  clusterSecret: "CHANGE-ME-USE-UUIDGEN"
+  encryptionSalt: "CHANGE-ME-RANDOM-STRING"
+  encryptionKey: "CHANGE-ME-RANDOM-KEY"
+
+# =============================================================================
+# AWS Credentials (Required for AWS cost monitoring)
+# =============================================================================
+serviceCredentials:
+  aws:
+    enabled: true
+    # Create an IAM user with read-only access to Cost Explorer and S3 (for CUR)
+    accessKeyId: "YOUR_AWS_ACCESS_KEY_ID"
+    secretAccessKey: "YOUR_AWS_SECRET_ACCESS_KEY"
+
+# =============================================================================
+# Database Passwords (CHANGE ALL OF THESE!)
+# =============================================================================
+mariadb:
+  credentials:
+    rootPassword: "CHANGE-ME-MARIADB-PASSWORD"
+
+mongodb:
+  credentials:
+    username: "root"
+    password: "CHANGE-ME-MONGODB-PASSWORD"
+    key: "CHANGE-ME-MONGODB-REPLICA-KEY"
+
+rabbitmq:
+  credentials:
+    username: "optscale"
+    password: "CHANGE-ME-RABBITMQ-PASSWORD"
+    cookie: "CHANGE-ME-ERLANG-COOKIE"
+
+clickhouse:
+  db:
+    password: "CHANGE-ME-CLICKHOUSE-PASSWORD"
+
+minio:
+  credentials:
+    accessKey: "optscale-minio"
+    secretKey: "CHANGE-ME-MINIO-PASSWORD"
+
+# =============================================================================
+# SMTP Configuration (Optional but recommended)
+# =============================================================================
+smtp:
+  enabled: true
+  server: "smtp.gmail.com"
+  port: 587
+  email: "optscale@yourcompany.com"
+  login: "your-email@gmail.com"
+  password: "your-app-password"
+  protocol: "TLS"
+
+# =============================================================================
+# SSL/TLS Configuration
+# =============================================================================
+ssl:
+  enabled: true
+  forceRedirect: true
+  certificateSecretName: "optscale-tls"
+  # Enable cert-manager for automatic Let's Encrypt certificates
+  certManager:
+    enabled: false
+    issuer: "letsencrypt-prod"
+    issuerType: "cluster-issuer"
+
+# =============================================================================
+# OAuth (Optional - for Google/Microsoft login)
+# =============================================================================
+oauth:
+  google:
+    clientId: ""
+    clientSecret: ""
+  microsoft:
+    clientId: ""
+
+# =============================================================================
+# Resource Limits (adjust based on your cluster capacity)
+# =============================================================================
+
+# For small clusters (8 CPU, 16GB RAM)
+restApi:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+diworker:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+mariadb:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+mongodb:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# =============================================================================
+# Optional Features (disable to reduce resource usage)
+# =============================================================================
+
+# Disable if not using Slack integration
+slacker:
+  enabled: false
+
+# Disable if not using Jira integration
+jiraBus:
+  enabled: false
+jiraUi:
+  enabled: false
+
+# Disable ELK stack to save resources (logs go to stdout)
+elk:
+  enabled: false
+
+# Disable Grafana if not needed
+grafana:
+  enabled: false
+
+# Disable demo features for production
+liveDemoGenerator:
+  enabled: false
+demoOrgCleanup:
+  enabled: false

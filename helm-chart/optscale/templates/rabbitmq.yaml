@@ -1,0 +1,131 @@
+{{- if .Values.rabbitmq.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  labels:
+    app: rabbitmq
+    {{- include "optscale.labels" . | nindent 4 }}
+data:
+  rabbitmq.conf: |
+    default_user = {{ .Values.rabbitmq.credentials.username }}
+    default_pass = {{ .Values.rabbitmq.credentials.password }}
+    vm_memory_high_watermark.absolute = {{ .Values.rabbitmq.memoryLimit }}MiB
+    disk_free_limit.absolute = 1GB
+    log.console = true
+    log.console.level = info
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels:
+    app: rabbitmq
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.rabbitmq.service.type }}
+  ports:
+    - port: {{ .Values.rabbitmq.service.port }}
+      targetPort: 5672
+      protocol: TCP
+      name: amqp
+    - port: {{ .Values.rabbitmq.service.managerPort }}
+      targetPort: 15672
+      protocol: TCP
+      name: management
+  selector:
+    app: rabbitmq
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  labels:
+    app: rabbitmq
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: rabbitmq
+          image: "{{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}"
+          imagePullPolicy: {{ .Values.rabbitmq.image.pullPolicy }}
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          env:
+            - name: RABBITMQ_ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optscale.fullname" . }}-rabbitmq
+                  key: cookie
+          readinessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - ping
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - -q
+                - status
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+            - name: config
+              mountPath: /etc/rabbitmq/rabbitmq.conf
+              subPath: rabbitmq.conf
+          {{- with .Values.rabbitmq.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: rabbitmq-config
+        {{- if .Values.rabbitmq.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: rabbitmq-data
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+{{- if .Values.rabbitmq.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-data
+  labels:
+    app: rabbitmq
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.rabbitmq.persistence.size }}
+{{- end }}
+{{- end }}

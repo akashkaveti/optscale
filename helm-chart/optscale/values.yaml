@@ -1,0 +1,1016 @@
+# OptScale Helm Chart Values
+# Maintained by: akashkaveti
+
+# =============================================================================
+# GLOBAL CONFIGURATION
+# =============================================================================
+global:
+  # Use official Hystax images (change to "akashkaveti" when you build your own)
+  imageRegistry: "hystax"
+  # Use "latest" for newest version, or specific tag like "3.0.0"
+  imageTag: "latest"
+  imagePullPolicy: IfNotPresent
+  # imagePullSecrets:
+  #   - name: docker-registry-secret
+
+# =============================================================================
+# CLUSTER SETTINGS
+# =============================================================================
+cluster:
+  # Your OptScale instance public IP or domain
+  publicIp: ""
+  # Company branding
+  companyName: "MyCompany"
+  productName: "OptScale"
+  # Cluster domain for internal DNS
+  clusterDomain: "cluster.local"
+
+# =============================================================================
+# SECRETS (CHANGE THESE BEFORE DEPLOYMENT!)
+# =============================================================================
+secrets:
+  # Unique cluster secret - generate with: uuidgen
+  clusterSecret: "change-me-to-unique-uuid"
+  # Encryption salt for user data
+  encryptionSalt: "change-me-encryption-salt"
+  # Encryption key
+  encryptionKey: "change-me-encryption-key"
+
+# =============================================================================
+# SERVICE CREDENTIALS (Required for cost recommendations)
+# =============================================================================
+serviceCredentials:
+  aws:
+    enabled: true
+    accessKeyId: ""
+    secretAccessKey: ""
+  azure:
+    enabled: false
+    clientId: ""
+    tenant: ""
+    secret: ""
+    subscriptionId: ""
+  gcp:
+    enabled: false
+    projectId: ""
+    credentials: {}
+  alibaba:
+    enabled: false
+    accessKeyId: ""
+    secretAccessKey: ""
+
+# =============================================================================
+# SSL/TLS CONFIGURATION
+# =============================================================================
+ssl:
+  enabled: true
+  forceRedirect: true
+  certificateSecretName: "optscale-tls"
+  # Use cert-manager for automatic certificate management
+  certManager:
+    enabled: false
+    issuer: ""
+    issuerType: "issuer"  # or "cluster-issuer"
+
+# =============================================================================
+# INGRESS CONFIGURATION
+# =============================================================================
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+
+# =============================================================================
+# SMTP CONFIGURATION (for email notifications)
+# =============================================================================
+smtp:
+  enabled: false
+  server: ""
+  port: 587
+  email: ""
+  login: ""
+  password: ""
+  protocol: "TLS"  # SSL or TLS
+
+# =============================================================================
+# OAUTH CONFIGURATION
+# =============================================================================
+oauth:
+  google:
+    clientId: ""
+    clientSecret: ""
+  microsoft:
+    clientId: ""
+
+# =============================================================================
+# CORE SERVICES
+# =============================================================================
+
+# REST API - Main API server
+restApi:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: rest_api
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8999
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# Auth Service
+auth:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: auth
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8905
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# NGUI - Frontend UI
+ngui:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ngui
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 4000
+  env:
+    buildMode: ""
+    googleMapApiKey: ""
+    ganalyticsId: ""
+    hotjarId: ""
+    organizationSetupMode: "automatic"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Keeper - Event tracking
+keeper:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: keeper
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8973
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Herald - Notification service
+herald:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: herald
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8906
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# =============================================================================
+# DATA IMPORT SERVICES
+# =============================================================================
+
+# DIWorker - Data Import Worker (handles AWS, Azure, GCP, K8s cost data)
+diworker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: diworker
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# DIProxy - Data Import Proxy
+diproxy:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: diproxy
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8935
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# =============================================================================
+# RECOMMENDATION ENGINE
+# =============================================================================
+
+# Bumi Scheduler
+bumiScheduler:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: bumischeduler
+  timeout: 300
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Bumi Worker
+bumiWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: bumiworker
+  maxRetries: 5
+  waitTimeout: 7200
+  taskTimeout: 3600
+  runPeriod: 10800
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# =============================================================================
+# PRICING SERVICE (Insider)
+# =============================================================================
+
+insiderApi:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: insider_api
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8945
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+insiderScheduler:
+  enabled: true
+  image:
+    repository: insider_scheduler
+  schedule: "0 0 * * *"
+
+insiderWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: insider_worker
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# =============================================================================
+# METRICS SERVICE (Metroculus)
+# =============================================================================
+
+metroculusApi:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: metroculus_api
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8969
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+metroculusScheduler:
+  enabled: true
+  image:
+    repository: metroculus_scheduler
+  schedule: "*/30 * * * *"
+
+metroculusWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: metroculus_worker
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# =============================================================================
+# REPORT SERVICE (Katara)
+# =============================================================================
+
+kataraService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: katara_service
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8935
+  schedulerTimeout: 3600
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+kataraWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: katara_worker
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+
+# =============================================================================
+# INTEGRATIONS
+# =============================================================================
+
+# Slack Integration
+slacker:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: slacker
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  signingSecret: ""
+  clientId: ""
+  clientSecret: ""
+
+slackerExecutor:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: slacker_executor
+
+# Jira Integration
+jiraBus:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: jira_bus
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8977
+
+jiraUi:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: jira_ui
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 4000
+
+# =============================================================================
+# SCHEDULED JOBS
+# =============================================================================
+
+# Resource Discovery
+resourceDiscovery:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: resource_discovery
+  schedule: "*/5 * * * *"
+  memoryLimit: 1024
+
+# Resource Observer
+resourceObserver:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: resource_observer
+  schedule: "*/5 * * * *"
+
+# Resource Violations
+resourceViolations:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: resource_violations
+  schedule: "*/5 * * * *"
+
+# Organization Violations
+organizationViolations:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: organization_violations
+  schedule: "*/5 * * * *"
+
+# Booking Observer
+bookingObserver:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: booking_observer
+  schedule: "*/1 * * * *"
+
+# Calendar Observer
+calendarObserver:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: calendar_observer
+  schedule: "0 * * * *"
+
+# Power Schedule
+powerSchedule:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: power_schedule
+  schedule: "*/5 * * * *"
+
+# Live Demo Generator
+liveDemoGenerator:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: live_demo_generator
+  schedule: "0 * * * *"
+
+# Report Import Scheduler
+reportImportScheduler:
+  enabled: true
+  image:
+    repository: curlimages/curl
+    tag: latest
+  schedules:
+    0: "*/15 * * * *"
+    1: "0 * * * *"
+    6: "0 */6 * * *"
+    24: "0 0 * * *"
+
+# =============================================================================
+# TRAPPER (Cloud Trail Processing)
+# =============================================================================
+
+trapperScheduler:
+  enabled: true
+  image:
+    repository: trapper_scheduler
+  schedule: "45 */1 * * *"
+
+trapperWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: trapper_worker
+
+# =============================================================================
+# RISP (Reserved Instance/Savings Plan)
+# =============================================================================
+
+rispScheduler:
+  enabled: true
+  image:
+    repository: risp_scheduler
+  schedule: "45 */1 * * *"
+
+rispWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: risp_worker
+
+# =============================================================================
+# GEMINI (S3 Duplicate Finder)
+# =============================================================================
+
+geminiScheduler:
+  enabled: true
+  image:
+    repository: gemini_scheduler
+  schedule: "*/5 * * * *"
+
+geminiWorker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: gemini_worker
+
+# =============================================================================
+# BI EXPORTER
+# =============================================================================
+
+biScheduler:
+  enabled: true
+  image:
+    repository: bi_scheduler
+  schedule: "*/5 * * * *"
+
+biExporter:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: bi_exporter
+  settings:
+    exporterRunPeriod: 86400
+    taskWaitTimeout: 259200
+
+# =============================================================================
+# EXECUTORS
+# =============================================================================
+
+heraldExecutor:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: herald_executor
+
+keeperExecutor:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: keeper_executor
+
+webhookExecutor:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: webhook_executor
+
+# =============================================================================
+# CLEANUP JOBS
+# =============================================================================
+
+cleanMongodb:
+  enabled: true
+  image:
+    repository: cleanmongodb
+  schedule: "*/3 * * * *"
+  chunkSize: 500
+  rowsLimit: 10000
+
+cleanInfluxdb:
+  enabled: true
+  image:
+    repository: cleaninfluxdb
+  schedule: "@weekly"
+  daysToStore: 90
+
+cleanElkdb:
+  enabled: false
+  image:
+    repository: cleanelkdb
+  schedule: "*/15 * * * *"
+  logMaxSize: 5120
+
+layoutCleaner:
+  enabled: true
+  image:
+    repository: layout_cleaner
+  schedule: "0 3 * * *"
+
+deactivatorg:
+  enabled: true
+  image:
+    repository: deactivatorg
+  schedule: "0 2 * * *"
+  daysLimit: 30
+
+demoOrgCleanup:
+  enabled: false
+  image:
+    repository: demo_org_cleanup
+  schedule: "0 0 * * *"
+  lifetimeHrs: 24
+
+
+# =============================================================================
+# INFRASTRUCTURE - DATABASES
+# =============================================================================
+
+# MariaDB
+mariadb:
+  enabled: true
+  image:
+    repository: mariadb
+  credentials:
+    rootPassword: "change-me-mariadb-password"
+  service:
+    type: ClusterIP
+    port: 3306
+  persistence:
+    enabled: true
+    hostPath: /optscale/db
+    size: 20Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# MongoDB
+mongodb:
+  enabled: true
+  external: false
+  image:
+    repository: mongo
+  credentials:
+    username: "root"
+    password: "change-me-mongodb-password"
+    key: "change-me-mongodb-key"
+  cacheSize: 1.0
+  service:
+    type: ClusterIP
+    port: 27017
+    targetPort: 27017
+  persistence:
+    enabled: true
+    hostPath: /optscale/mongo
+    size: 20Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 6379
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# etcd
+etcd:
+  enabled: true
+  image:
+    repository: etcd
+  service:
+    type: ClusterIP
+    port: 2379
+    peerPort: 2380
+  hbInterval: 500
+  electionTimeout: 5000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# RabbitMQ
+rabbitmq:
+  enabled: true
+  image:
+    repository: rabbitmq
+    tag: "3.13-management"
+    pullPolicy: IfNotPresent
+  credentials:
+    username: "optscale"
+    password: "change-me-rabbitmq-password"
+    cookie: "change-me-rabbitmq-cookie"
+  memoryLimit: 512
+  service:
+    type: ClusterIP
+    port: 5672
+    managerPort: 15672
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# InfluxDB
+influxdb:
+  enabled: true
+  image:
+    repository: influxdb
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8086
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# ClickHouse
+clickhouse:
+  enabled: true
+  external: false
+  image:
+    repository: clickhouse/clickhouse-server
+    tag: "23.8"
+    pullPolicy: IfNotPresent
+  db:
+    name: "default"
+    user: "default"
+    password: "change-me-clickhouse-password"
+  service:
+    type: ClusterIP
+    httpPort: 8123
+    nativePort: 9000
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# MinIO (Object Storage)
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  credentials:
+    accessKey: "optscale-minio"
+    secretKey: "change-me-minio-password"
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 9000
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+
+# ELK Stack (Elasticsearch, Logstash, Kibana)
+elk:
+  enabled: false
+  image:
+    repository: elk
+  esConnectRetry: 90
+  lsHeapSize: "2g"
+  esHeapSize: "1g"
+  service:
+    elasticPort: 9200
+    logstashTcpPort: 12201
+    logstashUdpPort: 12201
+    kibanaPort: 80
+  credentials:
+    username: "elkuser"
+    password: "change-me-elk-password"
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "2000m"
+
+# Filebeat
+filebeat:
+  enabled: false
+  image:
+    repository: filebeat
+
+# Grafana
+grafana:
+  enabled: true
+  image:
+    repository: grafana
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30082
+    targetPort: 3000
+  credentials:
+    username: "admin"
+    password: "change-me-grafana-password"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Thanos (Metrics)
+thanos:
+  enabled: true
+  
+  receive:
+    enabled: true
+    image:
+      repository: quay.io/thanos/thanos
+      tag: v0.32.5
+    replicaCount: 1
+    tsdbRetention: "4h"
+    memoryLimit: 8192
+    cpuLimit: 2
+    persistence:
+      size: 10Gi
+  
+  storegateway:
+    enabled: true
+    replicaCount: 1
+    persistence:
+      size: 10Gi
+  
+  query:
+    enabled: true
+    replicaCount: 1
+  
+  compactor:
+    enabled: true
+    schedule: "0 */12 * * *"
+    retentionRaw: "30d"
+    retention5m: "90d"
+    retention1h: "120d"
+    persistence:
+      size: 10Gi
+  
+  web:
+    enabled: true
+    refreshInterval: "10m"
+
+# =============================================================================
+# UTILITIES
+# =============================================================================
+
+# Error Pages
+errorPages:
+  enabled: true
+  image:
+    repository: error_pages
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+
+# phpMyAdmin
+phpmyadmin:
+  enabled: false
+  image:
+    repository: phpmyadmin/phpmyadmin
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080
+
+# =============================================================================
+# ADVANCED SETTINGS
+# =============================================================================
+
+# Token settings
+tokenExpiration: 168  # hours (1 week)
+inviteExpirationDays: 30
+
+# Import settings
+importReports:
+  messageExpirationSecs: 10800
+  notProcessedThresholdSecs: 10800
+  maxWorkers: 10
+
+# Demo settings
+demo:
+  multiplier: 2
+
+# Email verification
+disableEmailVerification: true
+
+# Password strength policy
+passwordStrength:
+  minLength: 8
+  minLowercase: 1
+  minUppercase: 1
+  minDigits: 1
+  minSpecialChars: 0
+
+# Database backup
+dbBackup:
+  enabled: false
+  schedule: "0 12 * * *"
+  mountpoint: /optscale/backup
+  keep: 5
+
+# Events queue
+eventsQueue: "events_queue"
+
+# Databases to create
+databases:
+  - auth-db
+  - my-db
+  - tasks
+  - herald
+  - katara
+  - slacker
+  - jira-bus

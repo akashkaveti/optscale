@@ -1,0 +1,247 @@
+{{- if and .Values.mongodb.enabled (not .Values.mongodb.external) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-scripts
+  labels:
+    app: mongodb
+    {{- include "optscale.labels" . | nindent 4 }}
+data:
+  init-replica-set.sh: |
+    #!/bin/bash
+    set -e
+    
+    MONGO_HOST="mongodb-0.mongodb-headless:27017"
+    MONGO_USER="{{ .Values.mongodb.credentials.username }}"
+    MONGO_PASS="{{ .Values.mongodb.credentials.password }}"
+    
+    echo "Waiting for MongoDB to be ready..."
+    until mongo --host $MONGO_HOST --eval "db.adminCommand('ping')" &>/dev/null; do
+      echo "MongoDB not ready yet, waiting..."
+      sleep 2
+    done
+    
+    echo "MongoDB is ready. Checking replica set status..."
+    
+    # Check if replica set is already initialized
+    RS_STATUS=$(mongo --host $MONGO_HOST --eval "rs.status().ok" 2>/dev/null || echo "0")
+    
+    if [ "$RS_STATUS" != "1" ]; then
+      echo "Initializing replica set..."
+      mongo --host $MONGO_HOST --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongodb-0.mongodb-headless:27017"}]})'
+      
+      echo "Waiting for replica set to initialize..."
+      sleep 5
+      
+      # Wait for PRIMARY state
+      until mongo --host $MONGO_HOST --eval "rs.status().myState" 2>/dev/null | grep -q "1"; do
+        echo "Waiting for PRIMARY state..."
+        sleep 2
+      done
+      
+      echo "Replica set initialized. Creating admin user..."
+      mongo --host $MONGO_HOST admin --eval "
+        if (db.getUsers().length == 0) {
+          db.createUser({
+            user: '$MONGO_USER',
+            pwd: '$MONGO_PASS',
+            roles: [{role: 'root', db: 'admin'}]
+          });
+          print('Admin user created');
+        } else {
+          print('Admin user already exists');
+        }
+      "
+    else
+      echo "Replica set already initialized"
+      
+      # Check if user exists, create if not
+      USER_EXISTS=$(mongo --host $MONGO_HOST -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --eval "db.adminCommand('ping')" 2>/dev/null && echo "yes" || echo "no")
+      
+      if [ "$USER_EXISTS" = "no" ]; then
+        echo "Creating admin user..."
+        mongo --host $MONGO_HOST admin --eval "
+          db.createUser({
+            user: '$MONGO_USER',
+            pwd: '$MONGO_PASS',
+            roles: [{role: 'root', db: 'admin'}]
+          });
+        " 2>/dev/null || echo "User may already exist"
+      fi
+    fi
+    
+    echo "MongoDB initialization complete!"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mongodb.service.type }}
+  ports:
+    - port: {{ .Values.mongodb.service.port }}
+      targetPort: 27017
+      protocol: TCP
+      name: mongodb
+  selector:
+    app: mongodb
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  labels:
+    app: mongodb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 27017
+      name: mongodb
+  publishNotReadyAddresses: true
+  selector:
+    app: mongodb
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  serviceName: mongodb-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: init-keyfile
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              cp /keydir-readonly/key /data/configdb/key.txt
+              chmod 600 /data/configdb/key.txt
+          volumeMounts:
+            - name: keydir
+              mountPath: /keydir-readonly
+            - name: configdir
+              mountPath: /data/configdb
+      containers:
+        - name: mongodb
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.mongodb.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optscale.fullname" . }}-mongodb
+                  key: username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optscale.fullname" . }}-mongodb
+                  key: password
+          command:
+            - mongod
+          args:
+            - --dbpath=/data/db
+            - --port=27017
+            - --bind_ip=0.0.0.0
+            - --auth
+            - --keyFile=/data/configdb/key.txt
+            - --storageEngine=wiredTiger
+            - --wiredTigerCacheSizeGB={{ .Values.mongodb.cacheSize }}
+            - --replSet=rs0
+          livenessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - mongo
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+            - name: configdir
+              mountPath: /data/configdb
+          {{- with .Values.mongodb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        # Sidecar to initialize replica set and create user
+        - name: mongodb-init
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.mongodb.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              /scripts/init-replica-set.sh
+              # Keep container running but idle after init
+              echo "Init complete. Sleeping..."
+              sleep infinity
+          volumeMounts:
+            - name: init-scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: keydir
+          secret:
+            secretName: {{ include "optscale.fullname" . }}-mongodb
+            items:
+              - key: key
+                path: key
+        - name: configdir
+          emptyDir: {}
+        - name: init-scripts
+          configMap:
+            name: mongodb-init-scripts
+            defaultMode: 0755
+        {{- if .Values.mongodb.persistence.enabled }}
+        - name: data
+          hostPath:
+            path: {{ .Values.mongodb.persistence.hostPath }}
+            type: DirectoryOrCreate
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+{{- end }}

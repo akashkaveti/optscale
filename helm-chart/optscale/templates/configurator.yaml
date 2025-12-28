@@ -1,0 +1,227 @@
+{{- /*
+Configurator Job - Initializes etcd with all service configurations
+This must run before other services can start
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configurator-config
+  labels:
+    app: configurator
+    {{- include "optscale.labels" . | nindent 4 }}
+data:
+  config.yml: |
+    skip_config_update: false
+    drop_tasks_db: false
+    databases:
+      {{- range .Values.databases }}
+      - {{ . | quote }}
+      {{- end }}
+    etcd:
+      public_ip: {{ .Values.cluster.publicIp | quote }}
+      company_name: {{ .Values.cluster.companyName | quote }}
+      product_name: {{ .Values.cluster.productName | quote }}
+      encryption_key: {{ .Values.secrets.encryptionKey | quote }}
+      encryption_salt: {{ .Values.secrets.encryptionSalt | quote }}
+      release: {{ .Release.Name | quote }}
+      token_expiration: {{ .Values.tokenExpiration }}
+      invite_expiration_days: {{ .Values.inviteExpirationDays }}
+      disable_email_verification: {{ .Values.disableEmailVerification }}
+      events_queue: {{ .Values.eventsQueue | quote }}
+      secret:
+        cluster: {{ .Values.secrets.clusterSecret | quote }}
+      restapi:
+        host: "restapi"
+        port: 80
+        report_imports:
+          not_processed_threshold_secs: 10800
+          message_expiration_secs: 10800
+      auth:
+        host: "auth"
+        port: 80
+      herald:
+        host: "herald"
+        port: 80
+      keeper:
+        host: "keeper"
+        port: 80
+      katara:
+        host: "katara"
+        port: 80
+      insider:
+        host: "insider-api"
+        port: 80
+      slacker:
+        host: "slacker"
+        port: 80
+      metroculus:
+        host: "metroculus-api"
+        port: 80
+      jirabus:
+        host: "jira-bus"
+        port: 80
+      diproxy:
+        host: "diproxy"
+        port: 80
+      thanos_query:
+        host: "thanos-query"
+        port: 10902
+      thanos_receive:
+        host: "thanos-receive"
+        port: 19291
+        path: "api/v1/receive"
+      restdb:
+        host: "mariadb"
+        port: 3306
+        user: "root"
+        password: {{ .Values.mariadb.credentials.rootPassword | quote }}
+        db: "my-db"
+      authdb:
+        host: "mariadb"
+        port: 3306
+        user: "root"
+        password: {{ .Values.mariadb.credentials.rootPassword | quote }}
+        db: "auth-db"
+      heralddb:
+        host: "mariadb"
+        port: 3306
+        user: "root"
+        password: {{ .Values.mariadb.credentials.rootPassword | quote }}
+        db: "herald"
+      kataradb:
+        host: "mariadb"
+        port: 3306
+        user: "root"
+        password: {{ .Values.mariadb.credentials.rootPassword | quote }}
+        db: "katara"
+      slackerdb:
+        host: "mariadb"
+        port: 3306
+        user: "root"
+        password: {{ .Values.mariadb.credentials.rootPassword | quote }}
+        db: "slacker"
+      jirabusdb:
+        host: "mariadb"
+        port: 3306
+        user: "root"
+        password: {{ .Values.mariadb.credentials.rootPassword | quote }}
+        db: "jira-bus"
+      mongo:
+        url: "mongodb://{{ .Values.mongodb.credentials.username }}:{{ .Values.mongodb.credentials.password }}@mongodb:27017/?replicaSet=rs0&authSource=admin"
+        database: "keeper"
+      rabbit:
+        host: "rabbitmq"
+        port: 5672
+        user: {{ .Values.rabbitmq.credentials.username | quote }}
+        pass: {{ .Values.rabbitmq.credentials.password | quote }}
+      influxdb:
+        host: "influxdb"
+        port: 80
+        user: ""
+        pass: ""
+        database: "metrics"
+      minio:
+        host: "minio"
+        port: 80
+        access: {{ .Values.minio.credentials.accessKey | quote }}
+        secret: {{ .Values.minio.credentials.secretKey | quote }}
+      clickhouse:
+        host: "clickhouse"
+        port: 8123
+        user: {{ .Values.clickhouse.db.user | quote }}
+        password: {{ .Values.clickhouse.db.password | quote }}
+        db: {{ .Values.clickhouse.db.name | quote }}
+      smtp:
+        server: {{ .Values.smtp.server | default "" | quote }}
+        port: {{ .Values.smtp.port | default 587 }}
+        email: {{ .Values.smtp.email | default "" | quote }}
+        login: {{ .Values.smtp.login | default "" | quote }}
+        password: {{ .Values.smtp.password | default "" | quote }}
+        protocol: {{ .Values.smtp.protocol | default "TLS" | quote }}
+      {{- if .Values.serviceCredentials.aws.enabled }}
+      service_credentials:
+        aws:
+          access_key_id: {{ .Values.serviceCredentials.aws.accessKeyId | quote }}
+          secret_access_key: {{ .Values.serviceCredentials.aws.secretAccessKey | quote }}
+      {{- end }}
+      bumi_scheduler_timeout: 300
+      bumi_worker:
+        max_retries: 5
+        wait_timeout: 7200
+        task_timeout: 3600
+        run_period: 10800
+      katara_scheduler_timeout: 3600
+      resource_discovery_settings:
+        discover_size: 10000
+        timeout: null
+        writing_timeout: 60
+        observe_timeout: 7200
+        debug: null
+      bi_settings:
+        exporter_run_period: 86400
+        encryption_key: "5t3X3PkQqF5edqW9_c8znow7k7GraZOpBLHhF1kFFvE="
+        task_wait_timeout: 259200
+      cleanmongodb:
+        chunk_size: 500
+        rows_limit: 10000
+        archive_enable: null
+        file_max_rows: 10000
+      demo:
+        multiplier: 2
+      diworker:
+        max_report_imports_workers: 10
+      force_aws_edp_strip: "False"
+      optscale_service_emails:
+        enabled: "False"
+        recipient: ""
+      optscale_error_emails:
+        enabled: "False"
+        recipient: ""
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: configurator-{{ .Release.Revision }}
+  labels:
+    app: configurator
+    {{- include "optscale.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app: configurator
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+        {{- include "optscale.waitForMariadb" . | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "minio" "service" "minio" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "influxdb" "service" "influxdb" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+      containers:
+        - name: configurator
+          image: "{{ .Values.global.imageRegistry }}/configurator:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: HX_ETCD_HOST
+              value: "etcd"
+            - name: HX_ETCD_PORT
+              value: "2379"
+          command:
+            - python
+            - docker_images/configurator/configurator.py
+            - /config/config.yml
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: config
+          configMap:
+            name: configurator-config

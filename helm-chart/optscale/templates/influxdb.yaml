@@ -1,0 +1,68 @@
+{{- if .Values.influxdb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb
+  labels:
+    app: influxdb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.influxdb.service.type }}
+  ports:
+    - port: {{ .Values.influxdb.service.port }}
+      targetPort: {{ .Values.influxdb.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: influxdb
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb
+  labels:
+    app: influxdb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: influxdb
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: influxdb
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: influxdb
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.influxdb.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.influxdb.service.targetPort }}
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: {{ .Values.influxdb.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: {{ .Values.influxdb.service.targetPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/influxdb
+          {{- with .Values.influxdb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: data
+          emptyDir: {}
+{{- end }}

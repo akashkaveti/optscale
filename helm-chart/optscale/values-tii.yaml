@@ -1,0 +1,426 @@
+# OptScale Values for tii-test.com
+# Generated with secure random passwords
+
+global:
+  imageRegistry: "hystax"
+  imageTag: "2025112701-public"
+  imagePullPolicy: IfNotPresent
+
+# =============================================================================
+# CLUSTER CONFIGURATION
+# =============================================================================
+cluster:
+  publicIp: "optscale.tii-test.com"
+  companyName: "TII"
+  productName: "OptScale"
+  clusterDomain: "cluster.local"
+
+# =============================================================================
+# SECRETS (Pre-generated secure values)
+# =============================================================================
+secrets:
+  clusterSecret: "a8f3d2e1-7b4c-49a6-8e5f-1c2d3e4f5a6b"
+  encryptionSalt: "Kx9mPqR3vT7wYz2B5nHjLcFgDsAe"
+  encryptionKey: "8f4a2c6e9b1d3f5a7c9e2b4d6f8a1c3e"
+
+# =============================================================================
+# SSL/TLS with Cert-Manager
+# =============================================================================
+ssl:
+  enabled: true
+  forceRedirect: true
+  certificateSecretName: "optscale-tls"
+  certManager:
+    enabled: true
+    issuer: "lets-encrypt-tii-test-com"
+    issuerType: "cluster-issuer"
+
+# =============================================================================
+# INGRESS
+# =============================================================================
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+
+# =============================================================================
+# AWS Credentials (Add your credentials here)
+# =============================================================================
+serviceCredentials:
+  aws:
+    enabled: true
+    # TODO: Add your AWS credentials
+    accessKeyId: ""
+    secretAccessKey: ""
+  azure:
+    enabled: false
+  gcp:
+    enabled: false
+  alibaba:
+    enabled: false
+
+# =============================================================================
+# DATABASE PASSWORDS (Secure random values)
+# =============================================================================
+mariadb:
+  enabled: true
+  credentials:
+    rootPassword: "Mdb7Kx9PqR3vT2wY"
+  persistence:
+    enabled: true
+    hostPath: /optscale/db
+
+mongodb:
+  enabled: true
+  external: false
+  credentials:
+    username: "root"
+    password: "Mng8Lz4NpS6uX1yB"
+    key: "MngKey5Hj7Km9Np2Qr4St6Uv8Wx0Yz1Ab3Cd"
+  cacheSize: 1.0
+  persistence:
+    enabled: true
+    hostPath: /optscale/mongo
+
+rabbitmq:
+  enabled: true
+  credentials:
+    username: "optscale"
+    password: "Rmq6Jh8Kl0Mn2Op4"
+    cookie: "RmqCookie3Ef5Gh7Ij9Kl1Mn3Op5Qr7St9Uv"
+  memoryLimit: 512
+
+redis:
+  enabled: true
+
+clickhouse:
+  enabled: true
+  external: false
+  db:
+    name: "default"
+    user: "default"
+    password: "Clk4Bc6De8Fg0Hi2"
+
+minio:
+  enabled: true
+  credentials:
+    accessKey: "optscale-minio"
+    secretKey: "Min5Jk7Lm9No1Pq3"
+  persistence:
+    enabled: true
+    size: 20Gi
+
+influxdb:
+  enabled: true
+
+etcd:
+  enabled: true
+  hbInterval: 500
+  electionTimeout: 5000
+
+# =============================================================================
+# CORE SERVICES
+# =============================================================================
+restApi:
+  enabled: true
+  replicaCount: 1
+
+auth:
+  enabled: true
+  replicaCount: 1
+
+ngui:
+  enabled: true
+  replicaCount: 1
+  env:
+    buildMode: ""
+    organizationSetupMode: "automatic"
+
+keeper:
+  enabled: true
+  replicaCount: 1
+
+herald:
+  enabled: true
+  replicaCount: 1
+
+diworker:
+  enabled: true
+  replicaCount: 1
+
+diproxy:
+  enabled: true
+  replicaCount: 1
+
+# =============================================================================
+# RECOMMENDATION ENGINE
+# =============================================================================
+bumiScheduler:
+  enabled: true
+  replicaCount: 1
+
+bumiWorker:
+  enabled: true
+  replicaCount: 1
+
+# =============================================================================
+# PRICING & METRICS
+# =============================================================================
+insiderApi:
+  enabled: true
+  replicaCount: 1
+
+insiderScheduler:
+  enabled: true
+
+insiderWorker:
+  enabled: true
+  replicaCount: 1
+
+metroculusApi:
+  enabled: true
+  replicaCount: 1
+
+metroculusScheduler:
+  enabled: true
+
+metroculusWorker:
+  enabled: true
+  replicaCount: 1
+
+# =============================================================================
+# REPORTS
+# =============================================================================
+kataraService:
+  enabled: true
+  replicaCount: 1
+
+kataraWorker:
+  enabled: true
+  replicaCount: 1
+
+# =============================================================================
+# SCHEDULED JOBS
+# =============================================================================
+resourceDiscovery:
+  enabled: true
+  replicaCount: 2
+
+resourceObserver:
+  enabled: true
+  replicaCount: 1
+
+resourceViolations:
+  enabled: true
+  replicaCount: 1
+
+organizationViolations:
+  enabled: true
+  replicaCount: 1
+
+bookingObserver:
+  enabled: true
+  replicaCount: 1
+
+powerSchedule:
+  enabled: true
+  replicaCount: 1
+
+reportImportScheduler:
+  enabled: true
+
+trapperScheduler:
+  enabled: true
+
+trapperWorker:
+  enabled: true
+  replicaCount: 1
+
+rispScheduler:
+  enabled: true
+
+rispWorker:
+  enabled: true
+  replicaCount: 1
+
+geminiScheduler:
+  enabled: true
+
+geminiWorker:
+  enabled: true
+  replicaCount: 1
+
+biScheduler:
+  enabled: true
+
+biExporter:
+  enabled: true
+  replicaCount: 1
+
+# =============================================================================
+# EXECUTORS
+# =============================================================================
+heraldExecutor:
+  enabled: true
+  replicaCount: 1
+
+keeperExecutor:
+  enabled: true
+  replicaCount: 1
+
+webhookExecutor:
+  enabled: true
+  replicaCount: 1
+
+# =============================================================================
+# CLEANUP JOBS
+# =============================================================================
+cleanMongodb:
+  enabled: true
+
+cleanInfluxdb:
+  enabled: true
+
+layoutCleaner:
+  enabled: true
+
+deactivatorg:
+  enabled: true
+  daysLimit: 30
+
+# =============================================================================
+# DISABLED FEATURES (Enable as needed)
+# =============================================================================
+slacker:
+  enabled: false
+
+slackerExecutor:
+  enabled: false
+
+jiraBus:
+  enabled: false
+
+jiraUi:
+  enabled: false
+
+elk:
+  enabled: false
+
+filebeat:
+  enabled: false
+
+cleanElkdb:
+  enabled: false
+
+grafana:
+  enabled: false
+
+calendarObserver:
+  enabled: false
+
+liveDemoGenerator:
+  enabled: false
+
+demoOrgCleanup:
+  enabled: false
+
+phpmyadmin:
+  enabled: false
+
+# =============================================================================
+# THANOS (Metrics storage)
+# =============================================================================
+thanos:
+  enabled: true
+  receive:
+    enabled: true
+    replicaCount: 1
+    retention: "15d"
+    maxConcurrency: 100
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+  storegateway:
+    enabled: true
+    replicaCount: 1
+    ignoreDeletionMarksDelay: "24h"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  query:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  compactor:
+    enabled: true
+    retentionRaw: "30d"
+    retention5m: "60d"
+    retention1h: "180d"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  web:
+    enabled: true
+
+errorPages:
+  enabled: true
+
+# =============================================================================
+# SETTINGS
+# =============================================================================
+tokenExpiration: 168
+inviteExpirationDays: 30
+disableEmailVerification: true
+eventsQueue: "events_queue"
+
+databases:
+  - auth-db
+  - my-db
+  - tasks
+  - herald
+  - katara
+  - slacker
+  - jira-bus
+
+# =============================================================================
+# SMTP (Optional - configure if you want email notifications)
+# =============================================================================
+smtp:
+  enabled: false
+  # server: "smtp.example.com"
+  # port: 587
+  # email: "optscale@tii-test.com"
+  # login: ""
+  # password: ""
+  # protocol: "TLS"
+
+# =============================================================================
+# OAuth (Optional)
+# =============================================================================
+oauth:
+  google:
+    clientId: ""
+    clientSecret: ""
+  microsoft:
+    clientId: ""

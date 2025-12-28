@@ -1,0 +1,251 @@
+# =============================================================================
+# INSIDER SCHEDULER
+# =============================================================================
+{{- if .Values.insiderScheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: insider-scheduler
+  labels:
+    app: insider-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: {{ .Values.insiderScheduler.schedule | quote }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: insider-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: insider-scheduler
+            {{- include "optscale.selectorLabels" . | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 12 }}
+            {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 12 }}
+          containers:
+            - name: insider-scheduler
+              image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.insiderScheduler.image) }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              env:
+                {{- include "optscale.commonEnv" . | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}
+---
+# =============================================================================
+# METROCULUS SCHEDULER
+# =============================================================================
+{{- if .Values.metroculusScheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: metroculus-scheduler
+  labels:
+    app: metroculus-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: {{ .Values.metroculusScheduler.schedule | quote }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: metroculus-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: metroculus-scheduler
+            {{- include "optscale.selectorLabels" . | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 12 }}
+            {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 12 }}
+          containers:
+            - name: metroculus-scheduler
+              image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.metroculusScheduler.image) }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              env:
+                {{- include "optscale.commonEnv" . | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}
+---
+# =============================================================================
+# TRAPPER SCHEDULER
+# =============================================================================
+{{- if .Values.trapperScheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trapper-scheduler
+  labels:
+    app: trapper-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: {{ .Values.trapperScheduler.schedule | quote }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: trapper-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: trapper-scheduler
+            {{- include "optscale.selectorLabels" . | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 12 }}
+            {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 12 }}
+          containers:
+            - name: trapper-scheduler
+              image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.trapperScheduler.image) }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              env:
+                {{- include "optscale.commonEnv" . | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}
+---
+# =============================================================================
+# RISP SCHEDULER
+# =============================================================================
+{{- if .Values.rispScheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: risp-scheduler
+  labels:
+    app: risp-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: {{ .Values.rispScheduler.schedule | quote }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: risp-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: risp-scheduler
+            {{- include "optscale.selectorLabels" . | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 12 }}
+            {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 12 }}
+          containers:
+            - name: risp-scheduler
+              image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.rispScheduler.image) }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              env:
+                {{- include "optscale.commonEnv" . | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}
+---
+# =============================================================================
+# GEMINI SCHEDULER
+# =============================================================================
+{{- if .Values.geminiScheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gemini-scheduler
+  labels:
+    app: gemini-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: {{ .Values.geminiScheduler.schedule | quote }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: gemini-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: gemini-scheduler
+            {{- include "optscale.selectorLabels" . | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 12 }}
+            {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 12 }}
+          containers:
+            - name: gemini-scheduler
+              image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.geminiScheduler.image) }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              env:
+                {{- include "optscale.commonEnv" . | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}
+---
+# =============================================================================
+# BI SCHEDULER
+# =============================================================================
+{{- if .Values.biScheduler.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bi-scheduler
+  labels:
+    app: bi-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  schedule: {{ .Values.biScheduler.schedule | quote }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    metadata:
+      labels:
+        app: bi-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: bi-scheduler
+            {{- include "optscale.selectorLabels" . | nindent 12 }}
+        spec:
+          initContainers:
+            {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 12 }}
+            {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 12 }}
+          containers:
+            - name: bi-scheduler
+              image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.biScheduler.image) }}
+              imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+              env:
+                {{- include "optscale.commonEnv" . | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}

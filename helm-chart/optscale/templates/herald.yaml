@@ -1,0 +1,109 @@
+{{- if .Values.herald.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: herald
+  labels:
+    app: herald
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.herald.service.type }}
+  ports:
+    - port: {{ .Values.herald.service.port }}
+      targetPort: {{ .Values.herald.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: herald-api
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+# Herald API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herald
+  labels:
+    app: herald-api
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.herald.replicaCount }}
+  selector:
+    matchLabels:
+      app: herald-api
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: herald-api
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+        {{- include "optscale.waitForMariadb" . | nindent 8 }}
+      containers:
+        - name: herald
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.herald.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.herald.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+            - name: HERALD_SERVICE
+              value: "api"
+          envFrom:
+            - configMapRef:
+                name: {{ include "optscale.fullname" . }}-config
+          {{- include "optscale.readinessProbe" (dict "port" .Values.herald.service.targetPort) | nindent 10 }}
+          {{- with .Values.herald.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+# Herald Engine (email sender)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: herald-engine
+  labels:
+    app: herald-engine
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.heraldExecutor.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: herald-engine
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: herald-engine
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: herald-engine
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.herald.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+            - name: HERALD_SERVICE
+              value: "engine"
+          volumeMounts:
+            - name: herald-email-templates-volume
+              mountPath: /usr/src/app/herald/modules/email_generator/custom_templates
+            - name: herald-custom-template-filters-volume
+              mountPath: /usr/src/app/herald/modules/email_generator/customer_filters
+          {{- with .Values.herald.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: herald-email-templates-volume
+          emptyDir: {}
+        - name: herald-custom-template-filters-volume
+          emptyDir: {}
+{{- end }}

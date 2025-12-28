@@ -1,0 +1,60 @@
+{{- if .Values.restApi.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: restapi
+  labels:
+    app: restapi
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.restApi.service.type }}
+  ports:
+    - port: {{ .Values.restApi.service.port }}
+      targetPort: {{ .Values.restApi.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: restapi
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restapi
+  labels:
+    app: restapi
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.restApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: restapi
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: restapi
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+        {{- include "optscale.waitForMariadb" . | nindent 8 }}
+      containers:
+        - name: restapi
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.restApi.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.restApi.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "optscale.fullname" . }}-config
+          {{- include "optscale.readinessProbe" (dict "port" .Values.restApi.service.targetPort) | nindent 10 }}
+          {{- with .Values.restApi.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

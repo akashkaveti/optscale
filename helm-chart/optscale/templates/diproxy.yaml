@@ -1,0 +1,58 @@
+{{- if .Values.diproxy.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: diproxy
+  labels:
+    app: diproxy
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.diproxy.service.type }}
+  ports:
+    - port: {{ .Values.diproxy.service.port }}
+      targetPort: {{ .Values.diproxy.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: diproxy
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diproxy
+  labels:
+    app: diproxy
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.diproxy.replicaCount }}
+  selector:
+    matchLabels:
+      app: diproxy
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: diproxy
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+      containers:
+        - name: diproxy
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.diproxy.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.diproxy.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "optscale.fullname" . }}-config
+          {{- include "optscale.readinessProbe" (dict "port" .Values.diproxy.service.targetPort) | nindent 10 }}
+          {{- with .Values.diproxy.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

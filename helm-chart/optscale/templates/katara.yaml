@@ -1,0 +1,134 @@
+{{- if .Values.kataraService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: katara
+  labels:
+    app: katara
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.kataraService.service.type }}
+  ports:
+    - port: {{ .Values.kataraService.service.port }}
+      targetPort: {{ .Values.kataraService.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: katara
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: katara
+  labels:
+    app: katara
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.kataraService.replicaCount }}
+  selector:
+    matchLabels:
+      app: katara
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: katara
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+        {{- include "optscale.waitForMariadb" . | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "restapi" "service" "restapi" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+      containers:
+        - name: katara
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.kataraService.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.kataraService.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+            - name: HX_KATARA_ROLE
+              value: "api"
+          envFrom:
+            - configMapRef:
+                name: {{ include "optscale.fullname" . }}-config
+          {{- include "optscale.readinessProbe" (dict "port" .Values.kataraService.service.targetPort) | nindent 10 }}
+          {{- with .Values.kataraService.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+# Katara Scheduler
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: katara-scheduler
+  labels:
+    app: katara-scheduler
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: katara-scheduler
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: katara-scheduler
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForMariadb" . | nindent 8 }}
+      containers:
+        - name: katara-scheduler
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.kataraService.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+            - name: HX_KATARA_ROLE
+              value: "scheduler"
+          {{- with .Values.kataraService.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+---
+{{- if .Values.kataraWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: katara-worker
+  labels:
+    app: katara-worker
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.kataraWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: katara-worker
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: katara-worker
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "rabbitmq" "service" "rabbitmq" "namespace" .Release.Namespace "port" "5672") | nindent 8 }}
+      containers:
+        - name: katara-worker
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.kataraWorker.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+          {{- with .Values.kataraWorker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

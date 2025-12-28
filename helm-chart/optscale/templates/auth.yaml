@@ -1,0 +1,69 @@
+{{- if .Values.auth.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  labels:
+    app: auth
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.auth.service.type }}
+  ports:
+    - port: {{ .Values.auth.service.port }}
+      targetPort: {{ .Values.auth.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: auth
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  labels:
+    app: auth
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.auth.replicaCount }}
+  selector:
+    matchLabels:
+      app: auth
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: auth
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "etcd" "service" "etcd" "namespace" .Release.Namespace "port" "2379") | nindent 8 }}
+        {{- include "optscale.waitForMariadb" . | nindent 8 }}
+      containers:
+        - name: auth
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.auth.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.auth.service.targetPort }}
+              name: http
+          env:
+            {{- include "optscale.commonEnv" . | nindent 12 }}
+            {{- if .Values.oauth.google.clientId }}
+            - name: GOOGLE_OAUTH_CLIENT_ID
+              value: {{ .Values.oauth.google.clientId | quote }}
+            - name: GOOGLE_OAUTH_CLIENT_SECRET
+              value: {{ .Values.oauth.google.clientSecret | quote }}
+            {{- end }}
+            {{- if .Values.oauth.microsoft.clientId }}
+            - name: MICROSOFT_OAUTH_CLIENT_ID
+              value: {{ .Values.oauth.microsoft.clientId | quote }}
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "optscale.fullname" . }}-config
+          {{- include "optscale.readinessProbe" (dict "port" .Values.auth.service.targetPort) | nindent 10 }}
+          {{- with .Values.auth.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

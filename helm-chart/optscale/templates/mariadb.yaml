@@ -1,0 +1,123 @@
+{{- if .Values.mariadb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  labels:
+    app: mariadb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mariadb.service.type }}
+  ports:
+    - port: {{ .Values.mariadb.service.port }}
+      targetPort: 3306
+      protocol: TCP
+      name: mysql
+  selector:
+    app: mariadb
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-config
+  labels:
+    app: mariadb
+    {{- include "optscale.labels" . | nindent 4 }}
+data:
+  mariadb.cnf: |
+    [mysqld]
+    max_connections = 4096
+    innodb_buffer_pool_size = 512M
+    innodb_log_file_size = 128M
+    innodb_flush_log_at_trx_commit = 2
+    character-set-server = utf8mb4
+    collation-server = utf8mb4_unicode_ci
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  labels:
+    app: mariadb
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  serviceName: mariadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        - name: copy-config
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command: ['sh', '-c', 'cp /configmap/* /etc/mysql/conf.d/']
+          volumeMounts:
+            - name: configmap
+              mountPath: /configmap
+            - name: config
+              mountPath: /etc/mysql/conf.d
+      containers:
+        - name: mariadb
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.mariadb.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "optscale.fullname" . }}-mariadb
+                  key: password
+          args: ["--max_connections=4096"]
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - mysql -h 127.0.0.1 -e "SELECT 1" -p$MYSQL_ROOT_PASSWORD
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - mysql -h 127.0.0.1 -e "SELECT 1" -p$MYSQL_ROOT_PASSWORD
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: config
+              mountPath: /etc/mysql/conf.d
+          {{- with .Values.mariadb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: configmap
+          configMap:
+            name: mariadb-config
+        - name: config
+          emptyDir: {}
+        {{- if .Values.mariadb.persistence.enabled }}
+        - name: data
+          hostPath:
+            path: {{ .Values.mariadb.persistence.hostPath }}
+            type: DirectoryOrCreate
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+{{- end }}

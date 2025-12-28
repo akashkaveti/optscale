@@ -1,0 +1,80 @@
+{{- if .Values.ngui.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: ngui
+  labels:
+    app: ngui
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.ngui.service.type }}
+  ports:
+    - port: {{ .Values.ngui.service.port }}
+      targetPort: {{ .Values.ngui.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: ngui
+    {{- include "optscale.selectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngui
+  labels:
+    app: ngui
+    {{- include "optscale.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.ngui.replicaCount }}
+  selector:
+    matchLabels:
+      app: ngui
+      {{- include "optscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: ngui
+        {{- include "optscale.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "optscale.waitForService" (dict "name" "auth" "service" "auth" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "restapi" "service" "restapi" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+        {{- include "optscale.waitForService" (dict "name" "keeper" "service" "keeper" "namespace" .Release.Namespace "port" "80") | nindent 8 }}
+      containers:
+        - name: ngui
+          image: {{ include "optscale.image" (dict "global" .Values.global "image" .Values.ngui.image) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.ngui.service.targetPort }}
+              name: http
+          env:
+            - name: BUILD_MODE
+              value: {{ .Values.ngui.env.buildMode | quote }}
+            - name: UI_BUILD_PATH
+              value: /usr/src/app/ui
+            - name: PROXY_URL
+              value: https://ngingress-nginx-ingress-controller:443
+            {{- if .Values.oauth.google.clientId }}
+            - name: VITE_GOOGLE_OAUTH_CLIENT_ID
+              value: {{ .Values.oauth.google.clientId | quote }}
+            {{- end }}
+            {{- if .Values.oauth.microsoft.clientId }}
+            - name: VITE_MICROSOFT_OAUTH_CLIENT_ID
+              value: {{ .Values.oauth.microsoft.clientId | quote }}
+            {{- end }}
+            {{- if .Values.ngui.env.googleMapApiKey }}
+            - name: VITE_GOOGLE_MAP_API_KEY
+              value: {{ .Values.ngui.env.googleMapApiKey | quote }}
+            {{- end }}
+            {{- if .Values.ngui.env.ganalyticsId }}
+            - name: VITE_GANALYTICS_ID
+              value: {{ .Values.ngui.env.ganalyticsId | quote }}
+            {{- end }}
+            - name: VITE_ON_INITIALIZE_ORGANIZATION_SETUP_MODE
+              value: {{ .Values.ngui.env.organizationSetupMode | quote }}
+          {{- include "optscale.readinessProbe" (dict "port" .Values.ngui.service.targetPort) | nindent 10 }}
+          {{- with .Values.ngui.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
